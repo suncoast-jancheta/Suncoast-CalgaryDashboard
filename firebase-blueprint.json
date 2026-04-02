@@ -1,0 +1,87 @@
+{
+  "entities": {
+    "users": {
+      "title": "User",
+      "description": "User profile and role information.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "email": { "type": "string", "format": "email", "description": "User's email address" },
+        "role": { "type": "string", "enum": ["admin", "viewer"], "description": "User's role (admin or viewer)" },
+        "displayName": { "type": "string", "description": "User's display name" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "goals": {
+      "title": "Goals",
+      "description": "Sales goals for the team and individuals.",
+      "type": "object",
+      "properties": {
+        "companyAnnualGoal": { "type": "number", "description": "Total annual goal for the whole company" },
+        "individualAnnualGoal": { "type": "number", "description": "Annual goal for each sales rep" },
+        "year": { "type": "integer", "description": "The year these goals apply to" }
+      },
+      "required": ["companyAnnualGoal", "individualAnnualGoal", "year"]
+    },
+    "salesReps": {
+      "title": "Sales Reps",
+      "description": "Information about the main sales reps.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string", "description": "Name of the sales rep" },
+        "mondayUserId": { "type": "string", "description": "Corresponding Monday.com user ID" },
+        "active": { "type": "boolean", "description": "Whether the rep is currently active" }
+      },
+      "required": ["name", "active"]
+    },
+    "config": {
+      "title": "Config",
+      "description": "Monday.com board and column mapping configuration.",
+      "type": "object",
+      "properties": {
+        "boardId": { "type": "string" },
+        "salesAmountColumnId": { "type": "string" },
+        "dateColumnId": { "type": "string" },
+        "salesRepColumnId": { "type": "string" },
+        "quoteStatusColumnId": { "type": "string" }
+      }
+    },
+    "board_cache": {
+      "title": "Board Cache",
+      "description": "Cached data from Monday.com to avoid API limits and improve speed.",
+      "type": "object",
+      "properties": {
+        "items": { "type": "array", "description": "List of cached items" },
+        "updatedAt": { "type": "string", "description": "Last sync time" },
+        "isChunked": { "type": "boolean", "description": "Whether data is split across multiple documents" },
+        "chunkCount": { "type": "number", "description": "Number of chunks if isChunked is true" }
+      }
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "users",
+      "description": "User profiles and roles."
+    },
+    "/goals/{goalId}": {
+      "schema": "goals",
+      "description": "Sales goals configuration."
+    },
+    "/salesReps/{repId}": {
+      "schema": "salesReps",
+      "description": "Main sales reps list."
+    },
+    "/config/{configId}": {
+      "schema": "config",
+      "description": "App configuration."
+    },
+    "/board_cache/{boardId}": {
+      "schema": "board_cache",
+      "description": "Main cache document for a board."
+    },
+    "/board_cache_{boardId}_{chunkIndex}/data": {
+      "schema": "board_cache",
+      "description": "Data chunks for large boards."
+    }
+  }
+}

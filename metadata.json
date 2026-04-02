@@ -1,0 +1,5 @@
+{
+  "name": "Calgary Sales Dashboard",
+  "description": "A dashboard for the Calgary office sales team, integrating data from Monday.com with role-based access control.",
+  "requestFramePermissions": []
+}

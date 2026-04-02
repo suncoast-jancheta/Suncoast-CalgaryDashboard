@@ -1,0 +1,131 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    //
+    // Collection: users
+    // Document ID: {userId} (Firebase Auth UID)
+    // Fields:
+    //   - uid: string (required) - Firebase Auth UID
+    //   - email: string (required, email format) - User's email address
+    //   - role: string (required, enum: ["admin", "viewer"]) - User's role
+    //   - displayName: string (optional) - User's display name
+    //
+    // Collection: goals
+    // Document ID: {goalId} (e.g., "2026")
+    // Fields:
+    //   - companyAnnualGoal: number (required) - Total annual goal
+    //   - individualAnnualGoal: number (required) - Annual goal for each sales rep
+    //   - year: integer (required) - The year these goals apply to
+    //
+    // Collection: salesReps
+    // Document ID: {repId}
+    // Fields:
+    //   - name: string (required) - Name of the sales rep
+    //   - active: boolean (required) - Whether the rep is currently active
+    //   - mondayUserId: string (optional) - Corresponding Monday.com user ID
+    //
+    // ===============================================================
+
+    // Helper Functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() &&
+        (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
+          (request.auth.token.email == "janchetasuncoast@gmail.com" && request.auth.token.email_verified == true));
+    }
+
+    function isValidEmail(email) {
+      return email is string && email.matches("^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$");
+    }
+
+    function hasOnlyAllowedFields(fields) {
+      return request.resource.data.keys().hasOnly(fields);
+    }
+
+    // Domain Validators
+    function isValidUser(data) {
+      return hasOnlyAllowedFields(['uid', 'email', 'role', 'displayName']) &&
+             data.uid is string && data.uid.size() > 0 &&
+             data.email is string && isValidEmail(data.email) &&
+             data.role in ['admin', 'viewer'];
+    }
+
+    function isValidGoal(data) {
+      return hasOnlyAllowedFields(['companyAnnualGoal', 'individualAnnualGoal', 'year']) &&
+             data.companyAnnualGoal is number && data.companyAnnualGoal > 0 &&
+             data.individualAnnualGoal is number && data.individualAnnualGoal > 0 &&
+             data.year is int;
+    }
+
+    function isValidSalesRep(data) {
+      return hasOnlyAllowedFields(['name', 'active', 'mondayUserId']) &&
+             data.name is string && data.name.size() > 0 &&
+             data.active is bool;
+    }
+
+    // Rules
+    match /users/{userId} {
+      allow read: if isOwner(userId) || isAdmin();
+      allow create: if isAuthenticated() && isValidUser(request.resource.data) && (isOwner(userId) || isAdmin());
+      allow update: if isAuthenticated() && isValidUser(request.resource.data) && (isOwner(userId) || isAdmin());
+      allow delete: if isAdmin();
+    }
+
+    match /goals/{goalId} {
+      allow read: if true;
+      allow write: if isAdmin() && isValidGoal(request.resource.data);
+    }
+
+    match /salesReps/{repId} {
+      allow read: if true;
+      allow write: if isAdmin() && isValidSalesRep(request.resource.data);
+    }
+
+    match /config/{configId} {
+      allow read: if true;
+      allow create: if isAdmin();
+      allow update: if isAuthenticated() && (isAdmin() || request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastRefreshAt']));
+    }
+
+    match /board_cache/{boardId} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    match /dashboard_data/{year} {
+      allow read: if true;
+      allow write: if isAuthenticated();
+    }
+
+    match /boards/{boardId} {
+      allow read: if true;
+      allow write: if isAdmin();
+      
+      match /items/{itemId} {
+        allow read: if true;
+        allow write: if isAdmin();
+      }
+    }
+
+    // Match chunked cache collections (e.g., board_cache_12345_1)
+    match /{chunkCollection}/data {
+      allow read: if chunkCollection.matches("^board_cache_.*");
+      allow write: if isAuthenticated() && chunkCollection.matches("^board_cache_.*");
+    }
+
+    // Default deny
+    match /{path=**} {
+      allow read, write: if false;
+    }
+  }
+}
